@@ -1,16 +1,32 @@
 from pymongo import MongoClient
 import pandas as pd
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+
+def get_dataframe_from_mongo(query={}):
+    mongo_uri = os.getenv("MONGO_URI")
+    db_name = os.getenv("DB_NAME")
+    collection_name = os.getenv("COLLECTION_NAME")
+    client = MongoClient(mongo_uri) 
+    db = client[db_name]
+    collection = db[collection_name]
+
+    cursor = collection.find(query)
+    data = list(cursor)
+    records = [doc['data'] for doc in data if 'data' in doc]
+
+    return pd.DataFrame(records)
 
 def extract(dataset):
-    df = pd.read_csv(dataset)  # you can also use read_csv() for .csv files
+    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
     metadata = []
-    for col in df.columns:
 
+    for col in df.columns:
         col_data = df[col]
         dtype = pd.api.types.infer_dtype(col_data, skipna=False)
-        print(f"{dtype}")
-
         if pd.api.types.is_numeric_dtype(col_data):
             if col_data.nunique() <= 5:
                 if col == "exercise_frequency_3":
@@ -43,8 +59,7 @@ def extract(dataset):
                 "missing": int(col_data.isna().sum()),
                 "unique_values": int(col_data.nunique())
             }
-
-        elif pd.api.types.is_string_dtype(col_data) or pd.api.types.is_categorical_dtype(col_data):
+        elif pd.api.types.is_string_dtype(col_data):
             top_values = col_data.value_counts().head(10).to_dict()
             summary = {
                 "column": col,
@@ -53,7 +68,6 @@ def extract(dataset):
                 "missing": int(col_data.isna().sum()),
                 "unique_values": int(col_data.nunique())
             }
-
         else:
             summary = {
                 "column": col,
@@ -65,4 +79,3 @@ def extract(dataset):
         metadata.append(summary)
 
     return metadata
-

@@ -2,6 +2,6 @@ venv/
 docker-compose.yml
 db.py
 datasets/
-Dockerfile
 mysqldb.py
 __pycache__/
+.env
