@@ -28,6 +28,7 @@ def extract(dataset):
     for col in df.columns:
         d_type = None
         parsed_col = None
+        print(col)
 
         if parsed_col is None and d_type is None:
             parsed_col = pd.to_numeric(df[col], errors='coerce')
@@ -57,10 +58,14 @@ def extract(dataset):
         if d_type == 'numeric':
             bins = pd.cut(parsed_col, bins=10)
             freq_table = bins.value_counts().sort_index().to_dict()
+            categories = {'keys':[], 'values':[]}
+            for key, value in freq_table.items():
+                categories['keys'].append(f"{round(key.left, 2)} - {round(key.right, 2)}")
+                categories['values'].append(value)
             summary = {
                 "column": col,
                 "type": d_type,
-                "categories": {f"{round(interval.left, 2)} - {round(interval.right, 2)}": count for interval, count in freq_table.items()},
+                "categories": categories,
                 "missing": int(parsed_col.isna().sum()),
                 "min": float(parsed_col.min()),
                 "max": float(parsed_col.max()),
@@ -70,21 +75,31 @@ def extract(dataset):
         elif d_type == 'date':
             bins = pd.cut(parsed_col, bins=10)
             freq_table = bins.value_counts().sort_index().to_dict()
+            categories = {'keys':[], 'values':[]}
+            for key, value in freq_table.items():
+                categories['keys'].append(f"{str(key.left).split(' ')[0]} - {str(key.right).split(' ')[0]}")
+                categories['values'].append(value)
 
             summary = {
                 "column": col,
                 "type": d_type,
-                "categories": {f"{str(interval.left).split(' ')[0]} - {str(interval.right).split(' ')[0]}": count for interval, count in freq_table.items()},
+                "categories": categories,
                 "missing": int(parsed_col.isna().sum()),
                 "min": parsed_col.min(),
                 "max": parsed_col.max(),
             }
         
         elif d_type == "categorical":
+            categories = {'keys':[], 'values':[]}
+       
+            for key, value in parsed_col.value_counts().sort_index().to_dict().items():
+                categories['keys'].append(key)
+                categories['values'].append(value)
+
             summary = {
                 "column": col,
                 "type": d_type,
-                "categories": parsed_col.value_counts().sort_index().to_dict(),
+                "categories": categories,
                 "missing": int(parsed_col.isna().sum()),
             }   
         metadata.append(summary)
