@@ -4,8 +4,8 @@ from analyser import extract
 app = FastAPI()
 
 @app.get('/dataset/extract-metadata/{dataset}')
-async def extract_metadata(dataset):
-    return extract(dataset)
+async def extract_metadata(dataset, replace_missing_values=False):
+    return extract(dataset, replace_missing_values)
 
 
 

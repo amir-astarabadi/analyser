@@ -19,9 +19,8 @@ def get_dataframe_from_mongo(query={}):
 
     return pd.DataFrame(records)
 
-def extract(dataset):
+def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
-
 
     metadata = []
 
@@ -56,22 +55,27 @@ def extract(dataset):
         
 
         if d_type == 'numeric':
+            average = float(parsed_col.min())
+            missing_values = int(parsed_col.isna().sum())
             bins = pd.cut(parsed_col, bins=10)
             freq_table = bins.value_counts().sort_index().to_dict()
             categories = {'keys':[], 'values':[]}
             for key, value in freq_table.items():
+                if replace_missing_values and (round(key.left, 2) < average < round(key.right, 2)):
+                    value += missing_values
                 categories['keys'].append(f"{round(key.left, 2)} {round(key.right, 2)}")
                 categories['values'].append(value)
             summary = {
                 "column": col,
                 "type": d_type,
                 "categories": categories,
-                "missing": int(parsed_col.isna().sum()),
-                "min": float(parsed_col.min()),
+                "missing": "replaced" if replace_missing_values else missing_values,
+                "min": average,
                 "max": float(parsed_col.max()),
                 "mean": float(parsed_col.mean()),
                 "median": float(parsed_col.median()),
             }
+
         elif d_type == 'date':
             bins = pd.cut(parsed_col, bins=10)
             freq_table = bins.value_counts().sort_index().to_dict()
