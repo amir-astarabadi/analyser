@@ -60,7 +60,7 @@ def extract(dataset):
             freq_table = bins.value_counts().sort_index().to_dict()
             categories = {'keys':[], 'values':[]}
             for key, value in freq_table.items():
-                categories['keys'].append(f"{round(key.left, 2)} - {round(key.right, 2)}")
+                categories['keys'].append(f"{round(key.left, 2)} {round(key.right, 2)}")
                 categories['values'].append(value)
             summary = {
                 "column": col,
@@ -77,7 +77,7 @@ def extract(dataset):
             freq_table = bins.value_counts().sort_index().to_dict()
             categories = {'keys':[], 'values':[]}
             for key, value in freq_table.items():
-                categories['keys'].append(f"{str(key.left).split(' ')[0]} - {str(key.right).split(' ')[0]}")
+                categories['keys'].append(f"{str(key.left).split(' ')[0]} {str(key.right).split(' ')[0]}")
                 categories['values'].append(value)
 
             summary = {
