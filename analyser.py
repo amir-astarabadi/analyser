@@ -13,11 +13,35 @@ def get_dataframe_from_mongo(query={}):
     db = client[db_name]
     collection = db[collection_name]
 
-    cursor = collection.find(query)
+    cursor = collection.find(query).sort({ 'row_index': 1 })
     data = list(cursor)
     records = [doc['data'] for doc in data if 'data' in doc]
 
     return pd.DataFrame(records)
+
+def line(dataset, independent_variable, dependent_variable, category_variable=None):
+    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}})
+    df = df.dropna(subset=[independent_variable, dependent_variable, category_variable]) if category_variable is not None else df.dropna(subset=[independent_variable, dependent_variable])
+    result = []
+    
+    if category_variable is None:
+        for col in df.columns:
+            if col in [dependent_variable, independent_variable]:
+                result.append({
+                    "dependents": df[col].tolist()
+                })
+            else:
+                continue
+        
+        return result
+    
+    for category, group in df.groupby(category_variable):
+        result.append({
+            "category": category,
+            "independents": group[independent_variable].tolist(),
+            "dependents": group[dependent_variable].tolist()
+        })
+    return result
 
 def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
@@ -63,7 +87,7 @@ def extract(dataset, replace_missing_values=False):
             for key, value in freq_table.items():
                 if replace_missing_values and (round(key.left, 2) < average < round(key.right, 2)):
                     value += missing_values
-                categories['keys'].append(f"{round(key.left, 2)} {round(key.right, 2)}")
+                categories['keys'].append(f"{round(key.left, 2)} , {round(key.right, 2)}")
                 categories['values'].append(value)
             summary = {
                 "column": col,
@@ -81,7 +105,7 @@ def extract(dataset, replace_missing_values=False):
             freq_table = bins.value_counts().sort_index().to_dict()
             categories = {'keys':[], 'values':[]}
             for key, value in freq_table.items():
-                categories['keys'].append(f"{str(key.left).split(' ')[0]} {str(key.right).split(' ')[0]}")
+                categories['keys'].append(f"{str(key.left).split(' ')[0]} , {str(key.right).split(' ')[0]}")
                 categories['values'].append(value)
 
             summary = {
