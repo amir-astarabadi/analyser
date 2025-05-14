@@ -23,7 +23,7 @@ def get_dataframe_from_mongo(query={}):
 def line(dataset, independent_variable, dependent_variable, category_variable=None):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}})
     df = df.dropna(subset=[independent_variable, dependent_variable, category_variable]) if category_variable is not None else df.dropna(subset=[independent_variable, dependent_variable])
-
+    df.sort_values(by=independent_variable, inplace=True)
     result = {
         "xLabel":independent_variable,
         "yLabel":dependent_variable,
@@ -35,7 +35,7 @@ def line(dataset, independent_variable, dependent_variable, category_variable=No
         del result['categories']
         result['series'].append({
             "name": f"{dependent_variable} base {independent_variable}",
-            "series": df[[independent_variable, dependent_variable]].to_numpy().tolist(),
+            "data": df[[independent_variable, dependent_variable]].to_numpy().tolist(),
         })
         return result
 
@@ -44,7 +44,7 @@ def line(dataset, independent_variable, dependent_variable, category_variable=No
         result['categories'].append(category)
         result['series'].append({
             "name": category,
-            "series": group[[independent_variable, dependent_variable]].to_numpy().tolist(),
+            "data": group[[independent_variable, dependent_variable]].to_numpy().tolist(),
         })
     return result
 
@@ -56,14 +56,15 @@ def extract(dataset, replace_missing_values=False):
     for col in df.columns:
         d_type = None
         parsed_col = None
-        print(col)
 
         if parsed_col is None and d_type is None:
             parsed_col = pd.to_numeric(df[col], errors='coerce')
+
             numerator = parsed_col.notna().sum()
-            denominator = parsed_col.isna().sum() 
+            denominator = df[col].isna().sum() 
             denominator = denominator if denominator > 0 else 1 
-            if (numerator / denominator) > 0.1 and len(parsed_col.dropna().unique()) > 5:
+ 
+            if (numerator / denominator) > 0.1 and len(parsed_col.dropna().unique()) > 10:
                 d_type = 'numeric'
             else:
                 parsed_col = None
@@ -71,18 +72,20 @@ def extract(dataset, replace_missing_values=False):
         if parsed_col is None and d_type is None:
             parsed_col = pd.to_datetime(df[col], format='%Y-%m-%d', errors='coerce')
             numerator = parsed_col.notna().sum()
-            denominator = parsed_col.isna().sum() 
+            denominator = df[col].isna().sum() 
             denominator = denominator if denominator > 0 else 1 
-            if (numerator / denominator) > 0.1:
+            if (numerator / denominator) > 0.1 or len(parsed_col.dropna().unique()) > 10:
                 d_type = 'date'
             else:
                 parsed_col = None
         
         if parsed_col is None and d_type is None:
-            d_type = 'categorical'
             parsed_col = df[col]
+            if len(parsed_col.dropna().unique()) > 10:
+                d_type = 'numeric'
+            else:
+                d_type = 'categorical'
         
-
         if d_type == 'numeric':
             average = float(parsed_col.min())
             missing_values = int(parsed_col.isna().sum())
