@@ -26,7 +26,7 @@ def line(dataset, independent_variable, dependent_variable, category_variable=No
 
     result = {
         "xLabel":independent_variable,
-        "YLabel":dependent_variable,
+        "yLabel":dependent_variable,
         "categories":[],
         "series":[]
     }
