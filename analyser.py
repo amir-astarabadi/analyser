@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
@@ -22,24 +23,28 @@ def get_dataframe_from_mongo(query={}):
 def line(dataset, independent_variable, dependent_variable, category_variable=None):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}})
     df = df.dropna(subset=[independent_variable, dependent_variable, category_variable]) if category_variable is not None else df.dropna(subset=[independent_variable, dependent_variable])
-    result = []
+
+    result = {
+        "xLabel":independent_variable,
+        "YLabel":dependent_variable,
+        "categories":[],
+        "series":[]
+    }
     
     if category_variable is None:
-        for col in df.columns:
-            if col in [dependent_variable, independent_variable]:
-                result.append({
-                    "dependents": df[col].tolist()
-                })
-            else:
-                continue
-        
+        del result['categories']
+        result['series'].append({
+            "name": f"{dependent_variable} base {independent_variable}",
+            "series": df[[independent_variable, dependent_variable]].to_numpy().tolist(),
+        })
         return result
+
     
     for category, group in df.groupby(category_variable):
-        result.append({
-            "category": category,
-            "independents": group[independent_variable].tolist(),
-            "dependents": group[dependent_variable].tolist()
+        result['categories'].append(category)
+        result['series'].append({
+            "name": category,
+            "series": group[[independent_variable, dependent_variable]].to_numpy().tolist(),
         })
     return result
 
