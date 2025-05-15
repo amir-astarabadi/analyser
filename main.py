@@ -12,4 +12,8 @@ async def extract_metadata(dataset, replace_missing_values=False):
 async def line_chart(dataset, independent_variable, dependent_variable, category_variable=None):
     return line(dataset, independent_variable, dependent_variable, category_variable)
 
+@app.get('/dataset/scatter-chart/{dataset}')
+async def scatter_chart(dataset, independent_variable, dependent_variable, category_variable=None):
+    return line(dataset, independent_variable, dependent_variable, category_variable)
+
 
