@@ -49,6 +49,17 @@ def line(dataset, independent_variable, dependent_variable, category_variable=No
         })
     return result
 
+def histogram(dataset, independent_variable, category_variable=None):
+    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
+    d_type = None
+    parsed_col = None
+
+    # check column datatype
+    # if it is numeric bin it
+    # return 
+    pass
+
+
 def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
 
@@ -58,34 +69,13 @@ def extract(dataset, replace_missing_values=False):
         d_type = None
         parsed_col = None
 
+        d_type, parsed_col = _is_numeric(df, col)    
         if parsed_col is None and d_type is None:
-            parsed_col = pd.to_numeric(df[col], errors='coerce')
+            d_type, parsed_col = _is_date(df, col)
+        
+        if parsed_col is None and d_type is None:
+            d_type, parsed_col = _distict_between_numeric_and_categorical(df, col)
 
-            numerator = parsed_col.notna().sum()
-            denominator = df[col].isna().sum() 
-            denominator = denominator if denominator > 0 else 1 
- 
-            if (numerator / denominator) > 0.1 and len(parsed_col.dropna().unique()) > 10:
-                d_type = 'numeric'
-            else:
-                parsed_col = None
-        
-        if parsed_col is None and d_type is None:
-            parsed_col = pd.to_datetime(df[col], format='%Y-%m-%d', errors='coerce')
-            numerator = parsed_col.notna().sum()
-            denominator = df[col].isna().sum() 
-            denominator = denominator if denominator > 0 else 1 
-            if (numerator / denominator) > 0.1 or len(parsed_col.dropna().unique()) > 10:
-                d_type = 'date'
-            else:
-                parsed_col = None
-        
-        if parsed_col is None and d_type is None:
-            parsed_col = df[col]
-            if len(parsed_col.dropna().unique()) > 10:
-                d_type = 'numeric'
-            else:
-                d_type = 'categorical'
         
         if d_type == 'numeric':
             average = float(parsed_col.min())
@@ -142,3 +132,44 @@ def extract(dataset, replace_missing_values=False):
         metadata.append(summary)
 
     return metadata
+
+def _is_numeric(df, col):
+    d_type, parsed_col = None, None
+    parsed_col = pd.to_numeric(df[col], errors='coerce')
+
+    numerator = parsed_col.notna().sum()
+    denominator = df[col].isna().sum() 
+    denominator = denominator if denominator > 0 else 1 
+
+    if (numerator / denominator) > 0.1 and len(parsed_col.dropna().unique()) > 10:
+        d_type = 'numeric'
+    else:
+        parsed_col = None
+    
+    return d_type, parsed_col
+
+def _is_date(df, col):
+    d_type, parsed_col = None, None
+
+    parsed_col = pd.to_datetime(df[col], format='%Y-%m-%d', errors='coerce')
+    numerator = parsed_col.notna().sum()
+    denominator = df[col].isna().sum() 
+    denominator = denominator if denominator > 0 else 1 
+
+    if (numerator / denominator) > 0.1 or len(parsed_col.dropna().unique()) > 10:
+        d_type = 'date'
+    else:
+        parsed_col = None
+    
+    return d_type, parsed_col
+
+def _distict_between_numeric_and_categorical(df, col):
+    d_type, parsed_col = None, None
+
+    parsed_col = df[col]
+    if len(parsed_col.dropna().unique()) > 10:
+        d_type = 'numeric'
+    else:
+        d_type = 'categorical'
+
+    return d_type, parsed_col
