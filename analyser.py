@@ -22,6 +22,8 @@ def get_dataframe_from_mongo(query={}):
 
 def line(dataset, independent_variable, dependent_variable, category_variable=None):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}})
+    df[independent_variable] = pd.to_numeric(df[independent_variable], errors='coerce')
+    df[dependent_variable] = pd.to_numeric(df[dependent_variable], errors='coerce')
     df = df.dropna(subset=[independent_variable, dependent_variable, category_variable]) if category_variable is not None else df.dropna(subset=[independent_variable, dependent_variable])
     df.sort_values(by=independent_variable, inplace=True)
     result = {
@@ -39,7 +41,6 @@ def line(dataset, independent_variable, dependent_variable, category_variable=No
         })
         return result
 
-    
     for category, group in df.groupby(category_variable):
         result['categories'].append(category)
         result['series'].append({
