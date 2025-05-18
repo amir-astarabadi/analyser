@@ -3,6 +3,10 @@ import numpy as np
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
+from helpers import dd
+
+
+
 
 load_dotenv()
 
@@ -49,16 +53,52 @@ def line(dataset, independent_variable, dependent_variable, category_variable=No
         })
     return result
 
-def histogram(dataset, independent_variable, category_variable=None):
-    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
-    d_type = None
-    parsed_col = None
-
-    # check column datatype
-    # if it is numeric bin it
-    # return 
-    pass
-
+def histogram(dataset, independent_variable, category_variable=None, statistics='count'):
+    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}})
+    variables = [v for v in [independent_variable, category_variable] if v is not None]
+    
+    df = df[variables]
+    df[independent_variable] = pd.to_numeric(df[independent_variable], errors='coerce')
+    df.dropna(inplace=True)
+    
+    df['bins'] = pd.cut(df[independent_variable], bins=10)
+    total = df[independent_variable].notna().sum()
+    
+    result = {
+        "xLabel":independent_variable,
+        "yLabel":statistics,
+        "categories":set(),
+        "series":[]
+    }
+    
+    if category_variable is not None:    
+        grouped = df.groupby([category_variable, 'bins'], observed=False).size().to_dict()
+        for key, count in grouped.items():
+            statistic = count
+            category = key[0]
+            interval = key[1]
+            if statistics == 'percent':
+                statistic = round((statistic / total) * 100, 2).__float__()
+            result['categories'].add(category)
+            result['series'].append({
+            "name": category,
+            "data": [f"{round(interval.left, 2)} , {round(interval.right, 2)}", statistic],
+        })
+        return result
+    else:
+        del result['categories']
+        grouped = df[['bins']].value_counts().sort_index().to_dict()
+        for interval, count in grouped.items():
+            interval = interval[0]
+            statistic = count
+            if statistics == 'percent':
+                statistic = round((statistic / total) * 100, 2).__float__()
+            category = f"{round(interval.left, 2)} , {round(interval.right, 2)}"
+            result['series'].append({
+            "name": category,
+            "data": [category, statistic],
+        })
+        return result
 
 def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
@@ -66,69 +106,16 @@ def extract(dataset, replace_missing_values=False):
     metadata = []
 
     for col in df.columns:
-        d_type = None
-        parsed_col = None
+        d_type, parsed_col = _parse_col(df, col)
 
-        d_type, parsed_col = _is_numeric(df, col)    
-        if parsed_col is None and d_type is None:
-            d_type, parsed_col = _is_date(df, col)
-        
-        if parsed_col is None and d_type is None:
-            d_type, parsed_col = _distict_between_numeric_and_categorical(df, col)
-
-        
         if d_type == 'numeric':
-            average = float(parsed_col.min())
-            missing_values = int(parsed_col.isna().sum())
-            bins = pd.cut(parsed_col, bins=10)
-            freq_table = bins.value_counts().sort_index().to_dict()
-            categories = {'keys':[], 'values':[]}
-            for key, value in freq_table.items():
-                if replace_missing_values and (round(key.left, 2) < average < round(key.right, 2)):
-                    value += missing_values
-                categories['keys'].append(f"{round(key.left, 2)} , {round(key.right, 2)}")
-                categories['values'].append(value)
-            summary = {
-                "column": col,
-                "type": d_type,
-                "categories": categories,
-                "missing": "replaced" if replace_missing_values else missing_values,
-                "min": average,
-                "max": float(parsed_col.max()),
-                "mean": float(parsed_col.mean()),
-                "median": float(parsed_col.median()),
-            }
+            summary = summarise_numeric_col(parsed_col, d_type, replace_missing_values, col)
 
         elif d_type == 'date':
-            bins = pd.cut(parsed_col, bins=10)
-            freq_table = bins.value_counts().sort_index().to_dict()
-            categories = {'keys':[], 'values':[]}
-            for key, value in freq_table.items():
-                categories['keys'].append(f"{str(key.left).split(' ')[0]} , {str(key.right).split(' ')[0]}")
-                categories['values'].append(value)
-
-            summary = {
-                "column": col,
-                "type": d_type,
-                "categories": categories,
-                "missing": int(parsed_col.isna().sum()),
-                "min": parsed_col.min(),
-                "max": parsed_col.max(),
-            }
+            summary = summerise_date_col(parsed_col, d_type, col)
         
         elif d_type == "categorical":
-            categories = {'keys':[], 'values':[]}
-       
-            for key, value in parsed_col.value_counts().sort_index().to_dict().items():
-                categories['keys'].append(key)
-                categories['values'].append(value)
-
-            summary = {
-                "column": col,
-                "type": d_type,
-                "categories": categories,
-                "missing": int(parsed_col.isna().sum()),
-            }   
+            summary = summerise_categorical_col(parsed_col, d_type, col)
         metadata.append(summary)
 
     return metadata
@@ -173,3 +160,70 @@ def _distict_between_numeric_and_categorical(df, col):
         d_type = 'categorical'
 
     return d_type, parsed_col
+
+def _parse_col(df, col):
+    d_type = None
+    parsed_col = None
+
+    d_type, parsed_col = _is_numeric(df, col)    
+    if parsed_col is None and d_type is None:
+        d_type, parsed_col = _is_date(df, col)
+    
+    if parsed_col is None and d_type is None:
+        d_type, parsed_col = _distict_between_numeric_and_categorical(df, col)
+    
+    return d_type, parsed_col
+
+def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
+    average = float(parsed_col.min())
+    missing_values = int(parsed_col.isna().sum())
+    bins = pd.cut(parsed_col, bins=10)
+    freq_table = bins.value_counts().sort_index().to_dict()
+    categories = {'keys':[], 'values':[]}
+    for key, value in freq_table.items():
+        if replace_missing_values and (round(key.left, 2) < average < round(key.right, 2)):
+            value += missing_values
+        categories['keys'].append(f"{round(key.left, 2)} , {round(key.right, 2)}")
+        categories['values'].append(value)
+    return {
+        "column": col,
+        "type": d_type,
+        "categories": categories,
+        "missing": "replaced" if replace_missing_values else missing_values,
+        "min": average,
+        "max": float(parsed_col.max()),
+        "mean": float(parsed_col.mean()),
+        "median": float(parsed_col.median()),
+    }
+
+def summerise_date_col(parsed_col, d_type, col):
+    bins = pd.cut(parsed_col, bins=10)
+    freq_table = bins.value_counts().sort_index().to_dict()
+    categories = {'keys':[], 'values':[]}
+    for key, value in freq_table.items():
+        categories['keys'].append(f"{str(key.left).split(' ')[0]} , {str(key.right).split(' ')[0]}")
+        categories['values'].append(value)
+
+    return {
+        "column": col,
+        "type": d_type,
+        "categories": categories,
+        "missing": int(parsed_col.isna().sum()),
+        "min": parsed_col.min(),
+        "max": parsed_col.max(),
+    }
+
+def summerise_categorical_col(parsed_col, d_type, col):
+    categories = {'keys':[], 'values':[]}
+
+    for key, value in parsed_col.value_counts().sort_index().to_dict().items():
+        categories['keys'].append(key)
+        categories['values'].append(value)
+
+    return {
+        "column": col,
+        "type": d_type,
+        "categories": categories,
+        "missing": int(parsed_col.isna().sum()),
+    } 
+    
