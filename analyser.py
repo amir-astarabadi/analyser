@@ -78,11 +78,16 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
             category = key[0]
             interval = key[1]
             if statistics == 'percent':
-                statistic = round((statistic / total) * 100, 2).__float__()
+                statistic = round((statistic / total) * 100, 3).__float__()
+            elif statistics == 'density':
+                bin_width = interval.right - interval.left
+                statistic = round(statistic / (total * bin_width), 3).__float__()
+                dd(category)
+                dd(statistic)
             result['categories'].add(category)
             result['series'].append({
             "name": category,
-            "data": [f"{round(interval.left, 2)} , {round(interval.right, 2)}", statistic],
+            "data": [f"{round(interval.left, 3)} , {round(interval.right, 3)}", statistic],
         })
         return result
     else:
@@ -92,14 +97,17 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
             interval = interval[0]
             statistic = count
             if statistics == 'percent':
-                statistic = round((statistic / total) * 100, 2).__float__()
-            category = f"{round(interval.left, 2)} , {round(interval.right, 2)}"
+                statistic = round((statistic / total) * 100, 3).__float__()
+            elif statistics == 'density':
+                bin_width = interval.right - interval.left
+                statistic = round(statistic / (total * bin_width), 3).__float__()
+            category = f"{round(interval.left, 3)} , {round(interval.right, 3)}"
             result['series'].append({
             "name": category,
             "data": [category, statistic],
         })
         return result
-
+histogram(12, 'age', 'sex', 'density')
 def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
 
