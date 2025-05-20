@@ -106,7 +106,7 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
             "data": [category, statistic],
         })
         return result
-histogram(12, 'age', 'sex', 'density')
+
 def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
 
