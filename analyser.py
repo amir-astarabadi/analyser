@@ -82,8 +82,7 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
             elif statistics == 'density':
                 bin_width = interval.right - interval.left
                 statistic = round(statistic / (total * bin_width), 3).__float__()
-                dd(category)
-                dd(statistic)
+        
             result['categories'].add(category)
             result['series'].append({
             "name": category,
