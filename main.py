@@ -18,7 +18,7 @@ async def scatter_chart(dataset, independent_variable, dependent_variable, categ
     return line(dataset, independent_variable, dependent_variable, category_variable)
 
 @app.get('/dataset/histogram-chart/{dataset}')
-async def histogram_chart(dataset, independent_variable,  category_variable=None, statistics='count'):
-    return histogram(dataset, independent_variable, category_variable, statistics)
+async def histogram_chart(dataset, independent_variable,  category_variable=None, statistic='count'):
+    return histogram(dataset, independent_variable, category_variable, statistic)
 
 
