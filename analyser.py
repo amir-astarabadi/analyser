@@ -4,6 +4,7 @@ from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
 from helpers import dd
+from math import sqrt
 
 
 
@@ -195,6 +196,7 @@ def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
             value += missing_values
         categories['keys'].append(f"{round(key.left, 2)} , {round(key.right, 2)}")
         categories['values'].append(value)
+    var = np.var(parsed_col)
     return {
         "column": col,
         "type": d_type,
@@ -204,6 +206,8 @@ def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
         "max": float(parsed_col.max()),
         "mean": float(parsed_col.mean()),
         "median": float(parsed_col.median()),
+        "variance": var,
+        "standard_deviation": sqrt(var),
     }
 
 def summerise_date_col(parsed_col, d_type, col):
