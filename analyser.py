@@ -111,8 +111,11 @@ def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
 
     metadata = []
+    df_rows = len(df)
 
-    for col in df.columns:
+    for index, col in enumerate(df.columns):
+        if index == 0 and len(pd.to_numeric(df[col], errors='coerce').unique()) == df_rows:
+            continue
         d_type, parsed_col = _parse_col(df, col)
 
         if d_type == 'numeric':
