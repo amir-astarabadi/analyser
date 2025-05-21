@@ -240,5 +240,3 @@ def summerise_categorical_col(parsed_col, d_type, col):
         "categories": categories,
         "missing": int(parsed_col.isna().sum()),
     } 
-
-print(extract(5))
