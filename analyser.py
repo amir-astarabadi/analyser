@@ -54,7 +54,7 @@ def line(dataset, independent_variable, dependent_variable, category_variable=No
         })
     return result
 
-def histogram(dataset, independent_variable, category_variable=None, statistics='count'):
+def histogram(dataset, independent_variable, category_variable=None, statistics='frequency'):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}})
     variables = [v for v in [independent_variable, category_variable] if v is not None]
     
