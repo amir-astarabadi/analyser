@@ -195,8 +195,8 @@ def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
         if replace_missing_values and (round(key.left, 2) < average < round(key.right, 2)):
             value += missing_values
         categories['keys'].append(f"{round(key.left, 2)} , {round(key.right, 2)}")
-        categories['values'].append(value)
-    var = np.var(parsed_col)
+        categories['values'].append(int(value))
+    var = np.var(parsed_col).__float__()
     return {
         "column": col,
         "type": d_type,
@@ -216,7 +216,7 @@ def summerise_date_col(parsed_col, d_type, col):
     categories = {'keys':[], 'values':[]}
     for key, value in freq_table.items():
         categories['keys'].append(f"{str(key.left).split(' ')[0]} , {str(key.right).split(' ')[0]}")
-        categories['values'].append(value)
+        categories['values'].append(int(value))
 
     return {
         "column": col,
@@ -232,7 +232,7 @@ def summerise_categorical_col(parsed_col, d_type, col):
 
     for key, value in parsed_col.value_counts().sort_index().to_dict().items():
         categories['keys'].append(key)
-        categories['values'].append(value)
+        categories['values'].append(int(value))
 
     return {
         "column": col,
@@ -240,4 +240,5 @@ def summerise_categorical_col(parsed_col, d_type, col):
         "categories": categories,
         "missing": int(parsed_col.isna().sum()),
     } 
-    
+
+print(extract(5))
