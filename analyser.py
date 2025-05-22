@@ -72,9 +72,11 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
         "series":[]
     }
     
-    if category_variable is not None:    
+    if category_variable is not None:
         grouped = df.groupby([category_variable, 'bins'], observed=False).size().to_dict()
+        series = {}
         for key, count in grouped.items():
+            
             statistic = count
             category = key[0]
             interval = key[1]
@@ -83,16 +85,26 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
             elif statistics == 'density':
                 bin_width = interval.right - interval.left
                 statistic = round(statistic / (total * bin_width), 3).__float__()
-        
+
             result['categories'].add(category)
-            result['series'].append({
-            "name": category,
-            "data": [f"{round(interval.left, 3)} , {round(interval.right, 3)}", statistic],
-        })
+            
+            if series.get(category) is None:
+                series[category] = {
+                    'name': category,
+                    'data': {'keys': [], 'values': []}
+                }
+
+            series[category]['data']['keys'].append(f"{round(interval.left, 3)} , {round(interval.right, 3)}")
+            series[category]['data']['values'].append(statistic)
+        
+        for key, value in series.items():
+            result['series'].append(value)
+            
         return result
     else:
         del result['categories']
         grouped = df[['bins']].value_counts().sort_index().to_dict()
+        result['series']={'kyes':[], 'values':[]}
         for interval, count in grouped.items():
             interval = interval[0]
             statistic = count
@@ -102,10 +114,9 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
                 bin_width = interval.right - interval.left
                 statistic = round(statistic / (total * bin_width), 3).__float__()
             category = f"{round(interval.left, 3)} , {round(interval.right, 3)}"
-            result['series'].append({
-            "name": category,
-            "data": [category, statistic],
-        })
+            result['series']['kyes'].append(category)
+            result['series']['values'].append(statistic)
+        
         return result
 
 def extract(dataset, replace_missing_values=False):
