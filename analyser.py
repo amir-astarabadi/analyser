@@ -119,6 +119,51 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
         
         return result
 
+def bar(dataset, independent_variable, category_variable=None):
+    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
+    
+    variables = [v for v in [independent_variable, category_variable] if v is not None]
+    df = df[variables].dropna()
+    df[independent_variable] = pd.to_numeric(df[independent_variable], errors='coerce')
+    
+    if category_variable is None:
+        var = np.var(df[independent_variable]).__float__()
+        bins = pd.cut(df[independent_variable], bins=10)
+        freq_table = bins.value_counts().sort_index().to_dict()
+        categories = {'keys':[], 'values':[]}
+        for key, value in freq_table.items():
+            categories['keys'].append(f"{round(key.left, 2)} , {round(key.right, 2)}")
+            categories['values'].append(int(value))
+        return {
+            "xLabel": independent_variable,
+            "yLabel":'frequency',
+            "series": categories,
+            "min": float(df[independent_variable].max()),
+            "max": float(df[independent_variable].max()),
+            "mean": float(df[independent_variable].mean()),
+            "median": float(df[independent_variable].median()),
+            "variance": var,
+            "standard_deviation": sqrt(var),
+        }
+    series = {
+            "xLabel": independent_variable,
+            "yLabel": 'frequency',
+            "categories": set(),
+            "series": [],
+    }
+    
+    df[independent_variable] = pd.to_numeric(df[independent_variable], errors='coerce')
+    groups = df.groupby([category_variable],observed=False)[independent_variable].agg(['mean', 'count', 'std','var', 'median', 'min', 'max']).reset_index()
+    for category in groups[category_variable].unique():
+        series['categories'].add(category)
+        category_df = groups[groups[category_variable] == category]
+        series['series'].append({
+            'name': category_df[category_variable].iloc[0],
+            'values': category_df[['mean','count','std','var','median','min','max']].iloc[0].to_dict()
+        })
+        
+    return series 
+
 def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
 
@@ -197,13 +242,13 @@ def _parse_col(df, col):
     return d_type, parsed_col
 
 def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
-    average = float(parsed_col.min())
+    average = float(parsed_col.mean())
     missing_values = int(parsed_col.isna().sum())
     bins = pd.cut(parsed_col, bins=10)
     freq_table = bins.value_counts().sort_index().to_dict()
     categories = {'keys':[], 'values':[]}
     for key, value in freq_table.items():
-        if replace_missing_values and (round(key.left, 2) < average < round(key.right, 2)):
+        if replace_missing_values and (round(key.left, 2) <= average < round(key.right, 2)):
             value += missing_values
         categories['keys'].append(f"{round(key.left, 2)} , {round(key.right, 2)}")
         categories['values'].append(int(value))
@@ -213,9 +258,9 @@ def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
         "type": d_type,
         "categories": categories,
         "missing": "replaced" if replace_missing_values else missing_values,
-        "min": average,
+        "min": float(parsed_col.min()),
         "max": float(parsed_col.max()),
-        "mean": float(parsed_col.mean()),
+        "mean": average,
         "median": float(parsed_col.median()),
         "variance": var,
         "standard_deviation": sqrt(var),

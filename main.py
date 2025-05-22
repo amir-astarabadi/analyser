@@ -1,7 +1,5 @@
-from fastapi import FastAPI, Depends
-from analyser import extract
-from analyser import line
-from analyser import histogram
+from fastapi import FastAPI
+from analyser import extract, line, histogram, bar
 
 app = FastAPI()
 
@@ -20,5 +18,9 @@ async def scatter_chart(dataset, independent_variable, dependent_variable, categ
 @app.get('/dataset/histogram-chart/{dataset}')
 async def histogram_chart(dataset, independent_variable,  category_variable=None, statistic='count'):
     return histogram(dataset, independent_variable, category_variable, statistic)
+
+@app.get('/dataset/bar-chart/{dataset}')
+async def bar_chart(dataset, independent_variable,  category_variable=None):
+    return bar(dataset, independent_variable, category_variable)
 
 
