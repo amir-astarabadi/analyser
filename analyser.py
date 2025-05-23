@@ -69,7 +69,7 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
         "xLabel":independent_variable,
         "yLabel":statistics,
         "categories":set(),
-        'xAxis': set(),
+        'xAxis': [],
         "series":[]
     }
     
@@ -88,7 +88,9 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
                 statistic = round(statistic / (total * bin_width), 3).__float__()
 
             result['categories'].add(category)
-            result['xAxis'].add(f"{round(interval.left, 3)} , {round(interval.right, 3)}")
+            axis = f"{round(interval.left, 3)} , {round(interval.right, 3)}"
+            if axis not in result['xAxis']:
+                result['xAxis'].append(axis)
             
             if series.get(category) is None:
                 series[category] = {
@@ -114,7 +116,10 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
             elif statistics == 'density':
                 bin_width = interval.right - interval.left
                 statistic = round(statistic / (total * bin_width), 3).__float__()
-            result['xAxis'].add(f"{round(interval.left, 3)} , {round(interval.right, 3)}")
+            
+            axis = f"{round(interval.left, 3)} , {round(interval.right, 3)}"
+            if axis not in result['xAxis']:
+                result['xAxis'].append(axis)
             result['series'][0]['data'].append(statistic)
         
         return result
