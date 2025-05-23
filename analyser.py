@@ -69,6 +69,7 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
         "xLabel":independent_variable,
         "yLabel":statistics,
         "categories":set(),
+        'xAxis': set(),
         "series":[]
     }
     
@@ -87,15 +88,15 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
                 statistic = round(statistic / (total * bin_width), 3).__float__()
 
             result['categories'].add(category)
+            result['xAxis'].add(f"{round(interval.left, 3)} , {round(interval.right, 3)}")
             
             if series.get(category) is None:
                 series[category] = {
                     'name': category,
-                    'data': {'keys': [], 'values': []}
+                    'data': []
                 }
 
-            series[category]['data']['keys'].append(f"{round(interval.left, 3)} , {round(interval.right, 3)}")
-            series[category]['data']['values'].append(statistic)
+            series[category]['data'].append(statistic)
         
         for key, value in series.items():
             result['series'].append(value)
@@ -104,7 +105,7 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
     else:
         del result['categories']
         grouped = df[['bins']].value_counts().sort_index().to_dict()
-        result['series']={'kyes':[], 'values':[]}
+        result['series'].append({'data': []})
         for interval, count in grouped.items():
             interval = interval[0]
             statistic = count
@@ -113,9 +114,8 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
             elif statistics == 'density':
                 bin_width = interval.right - interval.left
                 statistic = round(statistic / (total * bin_width), 3).__float__()
-            category = f"{round(interval.left, 3)} , {round(interval.right, 3)}"
-            result['series']['kyes'].append(category)
-            result['series']['values'].append(statistic)
+            result['xAxis'].add(f"{round(interval.left, 3)} , {round(interval.right, 3)}")
+            result['series'][0]['data'].append(statistic)
         
         return result
 
