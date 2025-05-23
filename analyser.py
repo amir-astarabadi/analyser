@@ -171,7 +171,7 @@ def extract(dataset, replace_missing_values=False):
     df_rows = len(df)
 
     for index, col in enumerate(df.columns):
-        if index == 0 and len(pd.to_numeric(df[col], errors='coerce').unique()) == df_rows:
+        if col in ['id', '_id'] or (index == 0 and len(pd.to_numeric(df[col], errors='coerce').unique()) == df_rows):
             continue
         d_type, parsed_col = _parse_col(df, col)
 
