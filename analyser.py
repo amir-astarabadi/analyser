@@ -277,8 +277,8 @@ def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
         "max": float(parsed_col.max()),
         "mean": average,
         "median": float(parsed_col.median()),
-        "variance": var,
-        "standard_deviation": sqrt(var),
+        "var": var,
+        "std": sqrt(var),
     }
 
 def summerise_date_col(parsed_col, d_type, col):
