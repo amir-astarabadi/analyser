@@ -20,7 +20,7 @@ async def histogram_chart(dataset, independent_variable,  category_variable=None
     return histogram(dataset, independent_variable, category_variable, statistic)
 
 @app.get('/dataset/bar-chart/{dataset}')
-async def bar_chart(dataset, independent_variable,  category_variable=None):
-    return bar(dataset, independent_variable, category_variable)
+async def bar_chart(dataset, independent_variable,  category_variable=None, statistic='frequency'): 
+    return bar(dataset, independent_variable, category_variable, statistic)
 
 

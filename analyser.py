@@ -124,61 +124,6 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
         
         return result
 
-def bar(dataset, independent_variable, category_variable=None, statistic='frequency'):
-    lookup_table = {
-        'frequency': 'count',
-        'percent': 'count',
-        'mean': 'mean'
-    }
-    
-    result = {
-            "xLabel": independent_variable,
-            "yLabel": statistic,
-            "categories": set(),
-            "xAxis": [],
-            "series": [],
-    }
-    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
-    
-    variables = [v for v in [independent_variable, category_variable] if v is not None]
-    df = df[variables].dropna()
-    df[independent_variable] = pd.to_numeric(df[independent_variable], errors='coerce')
-    
-    if category_variable is None:
-        del result['categories']
-        result['series'].append({'data': []})
-        
-        df['bins'] = pd.cut(df[independent_variable], bins=10)
-        statistics = df[independent_variable].agg(['mean', 'count', 'std','var', 'median', 'min', 'max']).to_dict()
-                
-        groups = df.groupby(['bins'],observed=False)[independent_variable].agg([lookup_table[statistic]]).reset_index()
-        for group in groups['bins'].unique():
-            point = f"{round(group.left, 2)} , {round(group.right, 2)}"
-            result['xAxis'].append(point)
-            group_df = groups[groups['bins'] == group]
-            value = group_df[lookup_table[statistic]].iloc[0] if statistic != 'percent' else round((group_df[lookup_table[statistic]].iloc[0] / statistics['count']) * 100, 3).__float__()
-            value = int(value) if statistic == "frequency" else round(value, 3).__float__()
-            result['series'][0]['data'].append(value)
-        result['series'][0]['statistics'] = statistics
-        return result
-    
-    df[independent_variable] = pd.to_numeric(df[independent_variable], errors='coerce')
-    groups = df.groupby([category_variable],observed=False)[independent_variable].agg(['mean', 'count', 'std','var', 'median', 'min', 'max']).reset_index()
-    
-    for category in groups[category_variable].unique():
-        result['categories'].add(category)
-        if category not in result['xAxis']:
-            result['xAxis'].append(category)
-        category_df = groups[groups[category_variable] == category]
-        statistics = category_df[['mean','count','std','var','median','min','max']].iloc[0].to_dict()
-        statistics['count'] = int(statistics['count'])
-        result['series'].append({
-            'name': category_df[category_variable].iloc[0],
-            'data': category_df[lookup_table[statistic]].iloc[0].tolist(),
-            'statistics': statistics
-        })
-    return result 
-
 def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
 
@@ -311,4 +256,59 @@ def summerise_categorical_col(parsed_col, d_type, col):
         "categories": categories,
         "missing": int(parsed_col.isna().sum()),
     } 
+
+
+def bar(dataset, independent_variable, category_variable=None, statistic='frequency'):
+    lookup_table = {
+        'frequency': 'count',
+        'percent': 'count',
+        'mean': 'mean'
+    }
     
+    result = {
+            "xLabel": independent_variable,
+            "yLabel": statistic,
+            "categories": set(),
+            "xAxis": [],
+            "series": [],
+    }
+    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
+    
+    variables = [v for v in [independent_variable, category_variable] if v is not None]
+    df = df[variables].dropna()
+    df[independent_variable] = pd.to_numeric(df[independent_variable], errors='coerce')
+    
+    if category_variable is None:
+        del result['categories']
+        result['series'].append({'data': []})
+        
+        df['bins'] = pd.cut(df[independent_variable], bins=10)
+        statistics = df[independent_variable].agg(['mean', 'count', 'std','var', 'median', 'min', 'max']).to_dict()
+                
+        groups = df.groupby(['bins'],observed=False)[independent_variable].agg([lookup_table[statistic]]).reset_index()
+        for group in groups['bins'].unique():
+            point = f"{round(group.left, 2)} , {round(group.right, 2)}"
+            result['xAxis'].append(point)
+            group_df = groups[groups['bins'] == group]
+            value = group_df[lookup_table[statistic]].iloc[0] if statistic != 'percent' else round((group_df[lookup_table[statistic]].iloc[0] / statistics['count']) * 100, 3).__float__()
+            value = int(value) if statistic == "frequency" else round(value, 3).__float__()
+            result['series'][0]['data'].append(value)
+        result['series'][0]['statistics'] = statistics
+        return result
+    
+    groups = df.groupby([category_variable],observed=False)[independent_variable].agg(['mean', 'count', 'std','var', 'median', 'min', 'max']).reset_index()
+    
+    for category in groups[category_variable].unique():
+        result['categories'].add(category)
+        if category not in result['xAxis']:
+            result['xAxis'].append(category)
+        category_df = groups[groups[category_variable] == category]
+        statistics = category_df[['mean','count','std','var','median','min','max']].iloc[0].to_dict()
+        statistics['count'] = int(statistics['count'])
+        
+        result['series'].append({
+            'name': category_df[category_variable].iloc[0],
+            'data': category_df[lookup_table[statistic]].iloc[0].tolist() if statistic != 'percent' else round((category_df[lookup_table[statistic]].iloc[0] / statistics['count']) * 100, 3).__float__(),
+            'statistics': statistics
+        })
+    return result 
