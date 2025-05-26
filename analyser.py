@@ -315,7 +315,10 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             result['xAxis'].append(bin)
         
         stat = row[lookup_table[statistic]] 
-        stat = round(stat, 2) if isinstance(stat, float) and stat > 1 else stat 
+        if stat is None:
+            stat = 0
+        else:
+            stat = round(stat, 2) if isinstance(stat, float) and stat > 1  else stat 
         if category_variable:
             if series.get(row['$$category_variable']) is None:
                 series[row['$$category_variable']] = {
