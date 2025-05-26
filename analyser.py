@@ -220,7 +220,7 @@ def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
         "missing": "replaced" if replace_missing_values else missing_values,
         "min": float(parsed_col.min()),
         "max": float(parsed_col.max()),
-        "mean": round(average, 2),
+        "mean": average,
         "median": float(parsed_col.median()),
         "var": var,
         "std": sqrt(var),
@@ -297,7 +297,6 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
         df['$$independent_variable'] = pd.to_numeric(df['$$independent_variable'], errors='coerce')
         df['$$bins'] = pd.cut(df['$$independent_variable'], bins=10)
         statistics = [ 'count', 'std','var', 'median', 'min', 'max', 'mean', 'median']
-                
         result['statistics']['overall_statitis'] = df['$$independent_variable'].agg(statistics).to_dict()
     
     if category_variable :
@@ -313,22 +312,17 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             bin = f"{round(bin.left, 2)} , {round(bin.right, 2)}"
         if bin not in result['xAxis']:
             result['xAxis'].append(bin)
-        
-        stat = row[lookup_table[statistic]] 
-        if stat is None:
-            stat = 0
-        else:
-            stat = round(stat, 2) if isinstance(stat, float) and stat > 1  else stat 
+            
         if category_variable:
             if series.get(row['$$category_variable']) is None:
                 series[row['$$category_variable']] = {
                     'name': row['$$category_variable'],
                     'data': []
                 }
-            series[row['$$category_variable']]['data'].append(stat)
+            series[row['$$category_variable']]['data'].append(row[lookup_table[statistic]])
             result['categories'].add(row['$$category_variable'])
         else:
-            data.append(stat)
+            data.append(row[lookup_table[statistic]])
             
     
     if data :
