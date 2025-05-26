@@ -262,7 +262,8 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
     lookup_table = {
         'frequency': 'count',
         'percent': 'count',
-        'mean': 'mean'
+        'mean': 'mean',
+        'median': 'median',
     }
     
     result = {
@@ -295,7 +296,7 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
     else :
         df['$$independent_variable'] = pd.to_numeric(df['$$independent_variable'], errors='coerce')
         df['$$bins'] = pd.cut(df['$$independent_variable'], bins=10)
-        statistics = [ 'count', 'std','var', 'median', 'min', 'max']
+        statistics = [ 'count', 'std','var', 'median', 'min', 'max', 'mean', 'median']
         result['statistics']['overall_statitis'] = df['$$independent_variable'].agg(statistics).to_dict()
     
     if category_variable :
