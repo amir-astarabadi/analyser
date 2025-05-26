@@ -268,47 +268,43 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
     result = {
             "xLabel": independent_variable,
             "yLabel": statistic,
-            "categories": set(),
             "xAxis": [],
-            "series": [],
+            "series": [{'data': []}],
+            "statistics": [],
     }
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
     
     variables = [v for v in [independent_variable, category_variable] if v is not None]
     df = df[variables].dropna()
     df[independent_variable] = pd.to_numeric(df[independent_variable], errors='coerce')
+    overall_statistics = df[independent_variable].agg(['mean', 'count', 'std','var', 'median', 'min', 'max']).to_dict()
     
     if category_variable is None:
-        del result['categories']
-        result['series'].append({'data': []})
-        
         df['bins'] = pd.cut(df[independent_variable], bins=10)
-        statistics = df[independent_variable].agg(['mean', 'count', 'std','var', 'median', 'min', 'max']).to_dict()
                 
-        groups = df.groupby(['bins'],observed=False)[independent_variable].agg([lookup_table[statistic]]).reset_index()
+        groups = df.groupby(['bins'],observed=False)[independent_variable].agg(['mean', 'count', 'std','var', 'median', 'min', 'max']).reset_index()
         for group in groups['bins'].unique():
-            point = f"{round(group.left, 2)} , {round(group.right, 2)}"
-            result['xAxis'].append(point)
+            interval = f"{round(group.left, 2)} , {round(group.right, 2)}"
+            result['xAxis'].append(interval)
             group_df = groups[groups['bins'] == group]
-            value = group_df[lookup_table[statistic]].iloc[0] if statistic != 'percent' else round((group_df[lookup_table[statistic]].iloc[0] / statistics['count']) * 100, 3).__float__()
+            statistics = group_df[['mean','count','std','var','median','min','max']].iloc[0].to_dict()
+            value = group_df[lookup_table[statistic]].iloc[0] if statistic != 'percent' else round((group_df[lookup_table[statistic]].iloc[0] / overall_statistics['count']) * 100, 3).__float__()
             value = int(value) if statistic == "frequency" else round(value, 3).__float__()
             result['series'][0]['data'].append(value)
-        result['series'][0]['statistics'] = statistics
+            result['statistics'].append({f"_{interval}": statistics})
+        result['statistics'].append({'overall_statistics': overall_statistics})
         return result
     
     groups = df.groupby([category_variable],observed=False)[independent_variable].agg(['mean', 'count', 'std','var', 'median', 'min', 'max']).reset_index()
     
     for category in groups[category_variable].unique():
-        result['categories'].add(category)
         if category not in result['xAxis']:
             result['xAxis'].append(category)
         category_df = groups[groups[category_variable] == category]
         statistics = category_df[['mean','count','std','var','median','min','max']].iloc[0].to_dict()
         statistics['count'] = int(statistics['count'])
-        
-        result['series'].append({
-            'name': category_df[category_variable].iloc[0],
-            'data': category_df[lookup_table[statistic]].iloc[0].tolist() if statistic != 'percent' else round((category_df[lookup_table[statistic]].iloc[0] / statistics['count']) * 100, 3).__float__(),
-            'statistics': statistics
-        })
+        result['statistics'].append(dict({f"_{category}": statistics }))
+        result['series'][0]['data'].append(category_df[lookup_table[statistic]].iloc[0].tolist() if statistic != 'percent' else round((category_df[lookup_table[statistic]].iloc[0] / statistics['count']) * 100, 3).__float__())
+    
+    result['statistics'].append({'overall_statistics': overall_statistics})
     return result 
