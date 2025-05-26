@@ -270,7 +270,7 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             "yLabel": statistic,
             "xAxis": [],
             "series": [],
-            "statistics": [],
+            "statistics": dict(),
             "categories":set(),
             
     }
@@ -291,12 +291,12 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
     if d_type == 'categorical':
         df['$$bins'] = df['$$independent_variable']
         statistics = ['count']
-        overall_statistics = df['$$independent_variable'].agg(statistics).to_dict()
+        result['statistics']['overall_statitis'] = df['$$independent_variable'].agg(statistics).to_dict()
     else :
         df['$$independent_variable'] = pd.to_numeric(df['$$independent_variable'], errors='coerce')
         df['$$bins'] = pd.cut(df['$$independent_variable'], bins=10)
         statistics = [ 'count', 'std','var', 'median', 'min', 'max']
-        overall_statistics = df['$$independent_variable'].agg(statistics).to_dict()
+        result['statistics']['overall_statitis'] = df['$$independent_variable'].agg(statistics).to_dict()
     
     if category_variable :
         groups = df.groupby(['$$bins', '$$category_variable'],observed=False)['$$independent_variable'].agg(statistics).reset_index()
@@ -329,10 +329,7 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             'data':data
         })
     if series:
-        for name, data in series.items():
-            result['series'].append({
-                'name': name,
-                'data': data
-            })
+        for key, data in series.items():
+            result['series'].append(data)
     
     return result
