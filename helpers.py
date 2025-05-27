@@ -5,12 +5,18 @@ def dd(value):
     print(type(value))
     input()
     
-def round_float(value:float):
+def round_float(value):
     try:
+        
         if isnan(value):
             return 0
-        if -1 < value < 1:
-            return value
-        return round(value, 2)
+        
+        if value == int(value):
+            return int(value)
+        
+        if value < -1 or value > 1:
+            value = round(value, 2)
+        
+        return value.__float__()
     except:
         return value

@@ -272,7 +272,7 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             "xAxis": [],
             "series": [],
             "statistics": dict(),
-            "categories":set(),
+            "categories": [],
             
     }
     
@@ -307,32 +307,50 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
         groups = df.groupby(['$$bins', '$$category_variable'],observed=False)['$$independent_variable'].agg(statistics).reset_index()
     else:
         groups = df.groupby('$$bins',observed=False)['$$independent_variable'].agg(statistics).reset_index()
-
+    
     data = []
     series = dict()
-    for index, row in groups.iterrows():
-        bin = row['$$bins']
-        if  isinstance(bin, pd.Interval):
-            bin = f"{round(bin.left, 2)} , {round(bin.right, 2)}"
-        if bin not in result['xAxis']:
-            result['xAxis'].append(bin)
-        
-        stat = row[lookup_table[statistic]]
-        if statistic == 'percent':
-            stat = (stat / overall_statitis['count']) * 100
-        
-        stat = round_float(stat)
+    result['categories'] = groups['$$category_variable'].unique() if category_variable else []
+    
+    _check_for_missed = dict()
+    
+    result['categories'] = sorted([b for b in result['categories'] if b is not None])
+    result['xAxis'] = sorted([b for b in df['$$bins'].unique() if b is not None])
+    series = dict()
+    for b in result['xAxis']:
         if category_variable:
-            if series.get(row['$$category_variable']) is None:
-                series[row['$$category_variable']] = {
-                    'name': row['$$category_variable'],
-                    'data': []
-                }
-            series[row['$$category_variable']]['data'].append(stat)
-            result['categories'].add(row['$$category_variable'])
+            for cat in result['categories']:
+                row = groups[(groups['$$bins'] == b) & (groups['$$category_variable'] == cat)]
+                if not row.empty:
+                    stat = round_float(row.iloc[0][lookup_table[statistic]])
+                    if statistic == 'percent':
+                        stat = (stat / overall_statitis['count']) * 100
+                else:
+                    stat = 0
+                
+                if not series.get(cat):
+                    series[cat] = {
+                        'name': cat,
+                        'data': []
+                    }
+                
+                series[cat]['data'].append(stat)
+                                    
         else:
+            row = groups[(groups['$$bins'] == b)]
+            if not row.empty:
+                stat = row.iloc[0][lookup_table[statistic]]
+                if statistic == 'percent':
+                    stat = (stat / overall_statitis['count']) * 100
+                stat = round_float(stat)
+            else:
+                stat = 0
+            
             data.append(stat)
             
+    for index, bin in enumerate(result['xAxis']):
+        if  isinstance(bin, pd.Interval):
+            result['xAxis'][index] = f"{round(bin.left, 2)} , {round(bin.right, 2)}"
     
     if data :
         result['series'].append({
