@@ -63,7 +63,7 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
     df.dropna(inplace=True)
     
     df['bins'] = pd.cut(df[independent_variable], bins=10)
-    total = df[independent_variable].notna().sum()
+    total = df[independent_variable].size
     
     result = {
         "xLabel":independent_variable,
@@ -74,24 +74,25 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
     }
     
     if category_variable is not None:
-        grouped = df.groupby([category_variable, 'bins'], observed=False).size().to_dict()
+        groups = df.groupby([category_variable, 'bins'], observed=False).agg(['count']).reset_index()
         series = {}
-        for key, count in grouped.items():
-            
-            statistic = count
-            category = key[0]
-            interval = key[1]
+        result['categories'] = sorted([b for b in groups[category_variable].unique() if b is not None])
+        result['xAxis'] = sorted([b for b in groups['bins'].unique() if b is not None])
+        
+        for index, x in enumerate(result['xAxis']):
+            if isinstance(x, pd.Interval):
+                result['xAxis'][index] = f"{round_float(x.left)} , {round_float(x.right)}" 
+                
+        series = dict()
+        for _, group in groups.iterrows():
+            statistic = group[(independent_variable, 'count')]
+            interval = group['bins'].iloc(0)
+            category = group[category_variable].iloc[0]
             if statistics == 'percent':
-                statistic = round((statistic / total) * 100, 3).__float__()
+                statistic = round_float((statistic / total) * 100)
             elif statistics == 'density':
-                bin_width = interval.right - interval.left
-                statistic = round(statistic / (total * bin_width), 3).__float__()
+                statistic = round_float(statistic / total)
 
-            result['categories'].add(category)
-            axis = f"{round(interval.left, 3)} , {round(interval.right, 3)}"
-            if axis not in result['xAxis']:
-                result['xAxis'].append(axis)
-            
             if series.get(category) is None:
                 series[category] = {
                     'name': category,
@@ -102,7 +103,7 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
         
         for key, value in series.items():
             result['series'].append(value)
-            
+        
         return result
     else:
         del result['categories']
@@ -112,10 +113,9 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
             interval = interval[0]
             statistic = count
             if statistics == 'percent':
-                statistic = round((statistic / total) * 100, 3).__float__()
+                statistic = round_float((statistic / total) * 100)
             elif statistics == 'density':
-                bin_width = interval.right - interval.left
-                statistic = round(statistic / (total * bin_width), 3).__float__()
+                statistic = round_float(statistic / total )
             
             axis = f"{round(interval.left, 3)} , {round(interval.right, 3)}"
             if axis not in result['xAxis']:
@@ -311,9 +311,7 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
     data = []
     series = dict()
     result['categories'] = groups['$$category_variable'].unique() if category_variable else []
-    
-    _check_for_missed = dict()
-    
+        
     result['categories'] = sorted([b for b in result['categories'] if b is not None])
     result['xAxis'] = sorted([b for b in df['$$bins'].unique() if b is not None])
     series = dict()
