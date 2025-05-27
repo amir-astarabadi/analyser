@@ -3,7 +3,7 @@ import numpy as np
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
-from helpers import dd
+from helpers import dd, round_float
 from math import sqrt
 
 
@@ -202,7 +202,7 @@ def _parse_col(df, col):
     return d_type, parsed_col
 
 def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
-    average = float(parsed_col.mean())
+    average = round_float(float(parsed_col.mean()))
     missing_values = int(parsed_col.isna().sum())
     bins = pd.cut(parsed_col, bins=10)
     freq_table = bins.value_counts().sort_index().to_dict()
@@ -218,12 +218,12 @@ def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
         "type": d_type,
         "categories": categories,
         "missing": "replaced" if replace_missing_values else missing_values,
-        "min": float(parsed_col.min()),
-        "max": float(parsed_col.max()),
+        "min": round_float(float(parsed_col.min())),
+        "max": round_float(float(parsed_col.max())),
         "mean": average,
-        "median": float(parsed_col.median()),
-        "var": var,
-        "std": sqrt(var),
+        "median": round_float(float(parsed_col.median())),
+        "var": round_float(var),
+        "std": round_float(sqrt(var)),
     }
 
 def summerise_date_col(parsed_col, d_type, col):
@@ -297,7 +297,11 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
         df['$$independent_variable'] = pd.to_numeric(df['$$independent_variable'], errors='coerce')
         df['$$bins'] = pd.cut(df['$$independent_variable'], bins=10)
         statistics = [ 'count', 'std','var', 'median', 'min', 'max', 'mean', 'median']
-        result['statistics']['overall_statitis'] = df['$$independent_variable'].agg(statistics).to_dict()
+        
+        overall_statitis =  df['$$independent_variable'].agg(statistics).to_dict()
+        for key, value in overall_statitis.items():
+            overall_statitis[key] = round_float(value)
+        result['statistics']['overall_statitis'] = overall_statitis
     
     if category_variable :
         groups = df.groupby(['$$bins', '$$category_variable'],observed=False)['$$independent_variable'].agg(statistics).reset_index()
@@ -312,17 +316,19 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             bin = f"{round(bin.left, 2)} , {round(bin.right, 2)}"
         if bin not in result['xAxis']:
             result['xAxis'].append(bin)
-            
+        
+        stat = row[lookup_table[statistic]]
+        stat = round_float(row[lookup_table[statistic]])
         if category_variable:
             if series.get(row['$$category_variable']) is None:
                 series[row['$$category_variable']] = {
                     'name': row['$$category_variable'],
                     'data': []
                 }
-            series[row['$$category_variable']]['data'].append(row[lookup_table[statistic]])
+            series[row['$$category_variable']]['data'].append(stat)
             result['categories'].add(row['$$category_variable'])
         else:
-            data.append(row[lookup_table[statistic]])
+            data.append(stat)
             
     
     if data :
