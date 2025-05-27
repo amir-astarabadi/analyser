@@ -298,11 +298,11 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
         df['$$bins'] = pd.cut(df['$$independent_variable'], bins=10)
         statistics = [ 'count', 'std','var', 'median', 'min', 'max', 'mean', 'median']
         
-        overall_statitis =  df['$$independent_variable'].agg(statistics).to_dict()
-        for key, value in overall_statitis.items():
-            overall_statitis[key] = round_float(value)
-        result['statistics']['overall_statitis'] = overall_statitis
-    
+    overall_statitis =  df['$$independent_variable'].agg(statistics).to_dict()
+    for key, value in overall_statitis.items():
+        overall_statitis[key] = round_float(value)
+    result['statistics']['overall_statitis'] = overall_statitis
+
     if category_variable :
         groups = df.groupby(['$$bins', '$$category_variable'],observed=False)['$$independent_variable'].agg(statistics).reset_index()
     else:
@@ -318,7 +318,10 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             result['xAxis'].append(bin)
         
         stat = row[lookup_table[statistic]]
-        stat = round_float(row[lookup_table[statistic]])
+        if statistic == 'percent':
+            stat = (stat / overall_statitis['count']) * 100
+        
+        stat = round_float(stat)
         if category_variable:
             if series.get(row['$$category_variable']) is None:
                 series[row['$$category_variable']] = {
