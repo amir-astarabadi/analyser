@@ -57,83 +57,125 @@ def line(dataset, independent_variable, dependent_variable, category_variable=No
         })
     return result
 
-def histogram(dataset, independent_variable, category_variable=None, statistics='frequency'):
-    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}})
-    variables = [v for v in [independent_variable, category_variable] if v is not None]
-    
-    df = df[variables]
-    df[independent_variable] = pd.to_numeric(df[independent_variable], errors='coerce')
-    df.dropna(inplace=True)
-    
-    df['bins'] = pd.cut(df[independent_variable], bins=10)
-    total = df[independent_variable].size
+def histogram(dataset, independent_variable, category_variable=None, statistic='frequency'):
+    lookup_table = {
+        'frequency': 'count',
+        'percent': 'count',
+        'density': 'count'
+    }
     
     result = {
-        "xLabel":independent_variable,
-        "yLabel":statistics,
-        "categories":set(),
-        'xAxis': [],
-        "series":[],
-        "density_curve": []
+            "xLabel": independent_variable,
+            "yLabel": statistic,
+            "xAxis": [],
+            "series": [],
+            "statistics": dict(),
+            "categories": [],
     }
-    if category_variable is not None:
-        groups = df.groupby([category_variable, 'bins'], observed=False).agg(['count']).reset_index()
-        series = {}
-        result['categories'] = sorted([b for b in groups[category_variable].unique() if b is not None])
-        result['xAxis'] = sorted([b for b in groups['bins'].unique() if b is not None])
-        
-        for index, x in enumerate(result['xAxis']):
-            if isinstance(x, pd.Interval):
-                result['xAxis'][index] = f"{round_float(x.left)} , {round_float(x.right)}" 
-                
-        series = dict()
-        for _, group in groups.iterrows():
-            statistic = group[(independent_variable, 'count')]
-            interval = group['bins'].iloc[0]
-            category = group[category_variable].iloc[0]
-            if statistics == 'percent':
-                statistic = round_float((statistic / total) * 100)
-            elif statistics == 'density':
-                statistic = round_float(statistic / total)
-            if statistics == 'density':
-                result['density_curve'].append({
-                    'name':category,
-                    'data': density_curve(df[(df[category_variable] == category) & (df['bins'] == interval)][independent_variable])
-                })                
+    if statistic == 'density':
+        result["density_curve"] = []
+    
+    necessary_columns = [col for col in ['$$independent_variable', category_variable] if col is not None]
+    
+    df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
+    df['$$independent_variable'] = df[independent_variable]
+    df = df[necessary_columns]
+    if category_variable is not None and df[category_variable].any():
+        df['$$category_variable'] = df[category_variable]
+        del df[category_variable]
+    
 
-            if series.get(category) is None:
-                series[category] = {
-                    'name': category,
-                    'data': []
-                }
+    d_type, parsed_col = _parse_col(df, '$$independent_variable')
+    del parsed_col
 
-            series[category]['data'].append(statistic)
-        
-        for key, value in series.items():
-            result['series'].append(value)
-        
-        return result
+    if d_type == 'categorical':
+        df['$$bins'] = df['$$independent_variable']
+        statistics = ['count']
+        result['statistics']['overall_statitis'] = df['$$independent_variable'].agg(statistics).to_dict()
+    else :
+        df['$$independent_variable'] = pd.to_numeric(df['$$independent_variable'], errors='coerce')
+        df['$$bins'] = pd.cut(df['$$independent_variable'], bins=10)
+        statistics = [ 'count', 'std','var', 'median', 'min', 'max', 'mean']
+    
+    df.dropna(inplace=True)
+    
+    overall_statitis =  df['$$independent_variable'].agg(statistics).to_dict()
+    for key, value in overall_statitis.items():
+        overall_statitis[key] = round_float(value)
+    result['statistics']['overall_statitis'] = overall_statitis
+
+    if category_variable :
+        groups = df.groupby(['$$bins', '$$category_variable'],observed=False)['$$independent_variable'].agg(statistics).reset_index()
     else:
-        del result['categories']
-        grouped = df[['bins']].value_counts().sort_index().to_dict()
-        result['series'].append({'data': []})
+        if statistic == 'density' and d_type == 'numeric':
+            result['density_curve'] = density_curve(df['$$independent_variable'])
+        groups = df.groupby('$$bins',observed=False)['$$independent_variable'].agg(statistics).reset_index()
+    data = []
+    series = dict()
+    result['categories'] = groups['$$category_variable'].unique() if category_variable else []
         
-        if statistics == 'density':
-            result['density_curve'] = density_curve(df[independent_variable])
-        for interval, count in grouped.items():
-            interval = interval[0]
-            statistic = count
-            if statistics == 'percent':
-                statistic = round_float((statistic / total) * 100)
-            elif statistics == 'density':
-                statistic = round_float(statistic / total )
+    result['categories'] = sorted([b for b in result['categories'] if b is not None])
+    result['xAxis'] = sorted([b for b in df['$$bins'].unique() if b is not None])
+    series = dict()
+    calculated_density_curves = set()
+    for b in result['xAxis']:
+        if category_variable:
+            for cat in result['categories']:
+                
+                if statistic == 'density' and d_type == 'numeric' and cat not in calculated_density_curves:
+                    result['density_curve'].append({
+                        'name':cat,
+                        'data': density_curve(df[(df['$$category_variable'] == cat) & (df['$$bins'] == b)]['$$independent_variable'])
+                    })  
+                    calculated_density_curves.add(cat)
+                    
+                row = groups[(groups['$$bins'] == b) & (groups['$$category_variable'] == cat)]
+                if not row.empty:
+                    stat = round_float(row.iloc[0][lookup_table[statistic]])
+                    if statistic == 'percent':
+                        stat = (stat / overall_statitis['count']) * 100
+                    elif statistic == 'density':
+                        stat = (stat / overall_statitis['count'])
+                    stat = round_float(stat)
+
+                else:
+                    stat = 0
+                
+                if not series.get(cat):
+                    series[cat] = {
+                        'name': cat,
+                        'data': []
+                    }
+                
+                series[cat]['data'].append(stat)
+                                    
+        else:
+            row = groups[(groups['$$bins'] == b)]
+            if not row.empty:
+                stat = row.iloc[0][lookup_table[statistic]]
+                if statistic == 'percent':
+                    stat = (stat / overall_statitis['count']) * 100
+                elif statistic == 'density':
+                    stat = (stat / overall_statitis['count'])
+                stat = round_float(stat)
+            else:
+                stat = 0
             
-            axis = f"{ round_float(interval.left)} , { round_float(interval.right)}"
-            if axis not in result['xAxis']:
-                result['xAxis'].append(axis)
-            result['series'][0]['data'].append(statistic)
-        
-        return result
+            data.append(stat)
+            
+    for index, bin in enumerate(result['xAxis']):
+        if  isinstance(bin, pd.Interval):
+            result['xAxis'][index] = f"{ round_float(bin.left)} , { round_float(bin.right)}"
+    
+    if data :
+        result['series'].append({
+            'data':data
+        })
+    if series:
+        for key, data in series.items():
+            result['series'].append(data)
+    
+    return result
 
 def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
@@ -274,6 +316,7 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
         'percent': 'count',
         'mean': 'mean',
         'median': 'median',
+        'density': 'count'
     }
     
     result = {
@@ -317,6 +360,8 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
     if category_variable :
         groups = df.groupby(['$$bins', '$$category_variable'],observed=False)['$$independent_variable'].agg(statistics).reset_index()
     else:
+        if statistic == 'density':
+                result['density_curve'] = density_curve(df['$$bins'])
         groups = df.groupby('$$bins',observed=False)['$$independent_variable'].agg(statistics).reset_index()
     
     data = []
@@ -334,6 +379,7 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
                     stat = round_float(row.iloc[0][lookup_table[statistic]])
                     if statistic == 'percent':
                         stat = (stat / overall_statitis['count']) * 100
+                    
                 else:
                     stat = 0
                 

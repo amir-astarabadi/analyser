@@ -29,7 +29,7 @@ def density_curve(data):
     density_curve_len = len(density_curve_data)
     if density_curve_len < 2:
         return []
-    density_curve_len = density_curve_len if density_curve_len < 100 else 10
+    density_curve_len = density_curve_len if density_curve_len < 100 else 100
     kde = gaussian_kde(density_curve_data)
     density_curve_x = np_linspace(min(density_curve_data), max(density_curve_data), density_curve_len)
     density_curve_y = kde(density_curve_x)
