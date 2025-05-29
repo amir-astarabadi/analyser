@@ -41,17 +41,19 @@ def line(dataset, independent_variable, dependent_variable, category_variable=No
     
     if category_variable is None:
         del result['categories']
+        data = df[[independent_variable, dependent_variable]].to_numpy().tolist()
         result['series'].append({
             "name": f"{dependent_variable} base {independent_variable}",
-            "data": df[[independent_variable, dependent_variable]].to_numpy().tolist(),
+            "data": [[round_float(i[0]), round_float(i[-1])] for i in data],
         })
         return result
 
     for category, group in df.groupby(category_variable):
+        data = group[[independent_variable, dependent_variable]].to_numpy().tolist() 
         result['categories'].append(category)
         result['series'].append({
             "name": category,
-            "data": group[[independent_variable, dependent_variable]].to_numpy().tolist(),
+            "data": [[round_float(i[0]), round_float(i[-1])] for i in data],
         })
     return result
 
@@ -367,5 +369,3 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             result['series'].append(data)
     
     return result
-
-print(histogram(12, 'age', statistics='density'))
