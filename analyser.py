@@ -128,7 +128,7 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
             elif statistics == 'density':
                 statistic = round_float(statistic / total )
             
-            axis = f"{round(interval.left, 3)} , {round(interval.right, 3)}"
+            axis = f"{ round_float(interval.left)} , { round_float(interval.right)}"
             if axis not in result['xAxis']:
                 result['xAxis'].append(axis)
             result['series'][0]['data'].append(statistic)
@@ -219,9 +219,9 @@ def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
     freq_table = bins.value_counts().sort_index().to_dict()
     categories = {'keys':[], 'values':[]}
     for key, value in freq_table.items():
-        if replace_missing_values and (round(key.left, 2) <= average < round(key.right, 2)):
+        if replace_missing_values and ( round_float(key.left) <= average <  round_float(key.right)):
             value += missing_values
-        categories['keys'].append(f"{round(key.left, 2)} , {round(key.right, 2)}")
+        categories['keys'].append(f"{ round_float(key.left)} , { round_float(key.right)}")
         categories['values'].append(int(value))
     var = np.var(parsed_col).__float__()
     return {
@@ -359,7 +359,7 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             
     for index, bin in enumerate(result['xAxis']):
         if  isinstance(bin, pd.Interval):
-            result['xAxis'][index] = f"{round(bin.left, 2)} , {round(bin.right, 2)}"
+            result['xAxis'][index] = f"{ round_float(bin.left)} , { round_float(bin.right)}"
     
     if data :
         result['series'].append({
