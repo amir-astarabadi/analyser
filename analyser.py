@@ -1,9 +1,10 @@
 import pandas as pd
 import numpy as np
+from scipy.stats import gaussian_kde
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
-from helpers import dd, round_float
+from helpers import dd, round_float, density_curve
 from math import sqrt
 
 
@@ -70,9 +71,9 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
         "yLabel":statistics,
         "categories":set(),
         'xAxis': [],
-        "series":[]
+        "series":[],
+        "density_curve": []
     }
-    
     if category_variable is not None:
         groups = df.groupby([category_variable, 'bins'], observed=False).agg(['count']).reset_index()
         series = {}
@@ -86,12 +87,17 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
         series = dict()
         for _, group in groups.iterrows():
             statistic = group[(independent_variable, 'count')]
-            interval = group['bins'].iloc(0)
+            interval = group['bins'].iloc[0]
             category = group[category_variable].iloc[0]
             if statistics == 'percent':
                 statistic = round_float((statistic / total) * 100)
             elif statistics == 'density':
                 statistic = round_float(statistic / total)
+            if statistics == 'density':
+                result['density_curve'].append({
+                    'name':category,
+                    'data': density_curve(df[(df[category_variable] == category) & (df['bins'] == interval)][independent_variable])
+                })                
 
             if series.get(category) is None:
                 series[category] = {
@@ -109,6 +115,9 @@ def histogram(dataset, independent_variable, category_variable=None, statistics=
         del result['categories']
         grouped = df[['bins']].value_counts().sort_index().to_dict()
         result['series'].append({'data': []})
+        
+        if statistics == 'density':
+            result['density_curve'] = density_curve(df[independent_variable])
         for interval, count in grouped.items():
             interval = interval[0]
             statistic = count
@@ -257,7 +266,6 @@ def summerise_categorical_col(parsed_col, d_type, col):
         "missing": int(parsed_col.isna().sum()),
     } 
 
-
 def bar(dataset, independent_variable, category_variable=None, statistic='frequency'):
     lookup_table = {
         'frequency': 'count',
@@ -359,3 +367,5 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             result['series'].append(data)
     
     return result
+
+print(histogram(12, 'age', statistics='density'))
