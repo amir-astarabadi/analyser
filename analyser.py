@@ -307,7 +307,8 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
         df['$$independent_variable'] = pd.to_numeric(df['$$independent_variable'], errors='coerce')
         df['$$bins'] = pd.cut(df['$$independent_variable'], bins=10)
         statistics = [ 'count', 'std','var', 'median', 'min', 'max', 'mean']
-        
+    
+    df.dropna(inplace=True)
     overall_statitis =  df['$$independent_variable'].agg(statistics).to_dict()
     for key, value in overall_statitis.items():
         overall_statitis[key] = round_float(value)
