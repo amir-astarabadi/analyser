@@ -24,13 +24,26 @@ def round_float(value):
     except:
         return value
 
-def density_curve(data):
+def density_curve(data, cat=None):
+
     density_curve_data = np_array(data)
     density_curve_len = len(density_curve_data)
     if density_curve_len < 2:
-        return []
+        return None
+    
+    result = {
+        'xAxis':None,
+        'data':None,
+    }
+    
+    if cat:
+        result['name'] = cat
+
     density_curve_len = density_curve_len if density_curve_len < 100 else 100
     kde = gaussian_kde(density_curve_data)
-    density_curve_x = np_linspace(min(density_curve_data), max(density_curve_data), density_curve_len)
-    density_curve_y = kde(density_curve_x)
-    return [[x.__float__(),y.__float__()] for x,y  in zip(density_curve_x, density_curve_y)]
+    result['xAxis'] = np_linspace(min(density_curve_data), max(density_curve_data), density_curve_len)
+    result['data'] = kde(result['xAxis']).tolist()
+    
+    result['xAxis'] = result['xAxis'].tolist()
+    
+    return result

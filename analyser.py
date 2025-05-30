@@ -108,7 +108,9 @@ def histogram(dataset, independent_variable, category_variable=None, statistic='
         groups = df.groupby(['$$bins', '$$category_variable'],observed=False)['$$independent_variable'].agg(statistics).reset_index()
     else:
         if statistic == 'density' and d_type == 'numeric':
-            result['density_curve'] = density_curve(df['$$independent_variable'])
+            d_curve = density_curve(df['$$independent_variable'])
+            if d_curve is not None: 
+                result['density_curve'].append(d_curve)
         groups = df.groupby('$$bins',observed=False)['$$independent_variable'].agg(statistics).reset_index()
     data = []
     series = dict()
@@ -123,11 +125,11 @@ def histogram(dataset, independent_variable, category_variable=None, statistic='
             for cat in result['categories']:
                 
                 if statistic == 'density' and d_type == 'numeric' and cat not in calculated_density_curves:
-                    result['density_curve'].append({
-                        'name':cat,
-                        'data': density_curve(df[(df['$$category_variable'] == cat) & (df['$$bins'] == b)]['$$independent_variable'])
-                    })  
                     calculated_density_curves.add(cat)
+                    d_curve = df[(df['$$category_variable'] == cat) & (df['$$bins'] == b)]['$$independent_variable']
+                    d_curve = density_curve(d_curve, cat)
+                    if d_curve is not None:
+                        result['density_curve'].append(d_curve)  
                     
                 row = groups[(groups['$$bins'] == b) & (groups['$$category_variable'] == cat)]
                 if not row.empty:
@@ -166,7 +168,6 @@ def histogram(dataset, independent_variable, category_variable=None, statistic='
     for index, bin in enumerate(result['xAxis']):
         if  isinstance(bin, pd.Interval):
             result['xAxis'][index] = f"{ round_float(bin.left)} , { round_float(bin.right)}"
-    
     if data :
         result['series'].append({
             'data':data
@@ -360,8 +361,6 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
     if category_variable :
         groups = df.groupby(['$$bins', '$$category_variable'],observed=False)['$$independent_variable'].agg(statistics).reset_index()
     else:
-        if statistic == 'density':
-                result['density_curve'] = density_curve(df['$$bins'])
         groups = df.groupby('$$bins',observed=False)['$$independent_variable'].agg(statistics).reset_index()
     
     data = []
