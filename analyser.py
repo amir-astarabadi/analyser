@@ -265,7 +265,7 @@ def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
             value += missing_values
         categories['keys'].append(f"{ round_float(key.left)} , { round_float(key.right)}")
         categories['values'].append(int(value))
-    var = np.var(parsed_col).__float__()
+    var = np.var(parsed_col, ddof=1).__float__()
     return {
         "column": col,
         "type": d_type,
