@@ -1,0 +1,3 @@
+
+class IDLikeColumnException(Exception):
+    pass

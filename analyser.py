@@ -1,11 +1,11 @@
 import pandas as pd
 import numpy as np
-from scipy.stats import gaussian_kde
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
 from helpers import dd, round_float, density_curve
 from math import sqrt
+from Exceptions import ParseColException, SummeriseColException, IDLikeColumnException
 
 
 
@@ -181,23 +181,62 @@ def histogram(dataset, independent_variable, category_variable=None, statistic='
 def extract(dataset, replace_missing_values=False):
     df = get_dataframe_from_mongo({"dataset_id":{"$eq":int(dataset)}}) 
 
-    metadata = []
+    metadata = {
+        'parsed_colums': [],
+        'unrecognized_format' : []
+    }
     df_rows = len(df)
 
     for index, col in enumerate(df.columns):
-        if col in ['id', '_id'] or (index == 0 and len(pd.to_numeric(df[col], errors='coerce').unique()) == df_rows):
-            continue
-        d_type, parsed_col = _parse_col(df, col)
+        try:
+            if col in ['id', '_id'] or (index == 0 and len(pd.to_numeric(df[col], errors='coerce').unique()) == df_rows):
+                if col == '_id':
+                    col = 'id'
+                raise IDLikeColumnException(f'Structure of {col} is like identifier columns.')
+            d_type, parsed_col = _parse_col(df, col)
 
-        if d_type == 'numeric':
-            summary = summarise_numeric_col(parsed_col, d_type, replace_missing_values, col)
+            summary = None
+            if d_type == 'numeric':
+                summary = summarise_numeric_col(parsed_col, d_type, replace_missing_values, col)
+                metadata['parsed_colums'].append(summary)
+                continue
 
-        elif d_type == 'date':
-            summary = summerise_date_col(parsed_col, d_type, col)
+            elif d_type == 'date':
+                summary = summerise_date_col(parsed_col, d_type, col)
+                metadata['parsed_colums'].append(summary)
+                continue
+
+            elif d_type == "categorical":
+                if len(parsed_col.dropna().unique()) >= df_rows:
+                    raise IDLikeColumnException(f'Structure of {col} is like identifier columns.')
+                summary = summerise_categorical_col(parsed_col, d_type, col)
+                metadata['parsed_colums'].append(summary)
+                continue
         
-        elif d_type == "categorical":
-            summary = summerise_categorical_col(parsed_col, d_type, col)
-        metadata.append(summary)
+        except IDLikeColumnException as i:
+            metadata['unrecognized_format'].append({
+                "message": f"{i}",
+                "column": col,
+                "type": "identifier",
+            })
+            continue       
+
+        except Exception as e:
+            metadata['unrecognized_format'].append({
+                "message": f"{repr(e)}",
+                "column": col,
+                "type": "Unkown",
+            })
+            continue
+                                
+
+        if not summary:
+            metadata['unrecognized_format'].append({
+                "column": col,
+                "type": "Unkown",
+                "message": f"Some thing unpredicted happend for column {col}(please report this)"
+            })
+            continue
 
     return metadata
 
@@ -236,80 +275,98 @@ def _distict_between_numeric_and_categorical(df, col):
 
     parsed_col = df[col]
     if len(parsed_col.dropna().unique()) > 10:
-        d_type = 'numeric'
+        try:
+            pd.to_numeric(df[col], errors='raise')
+            d_type = 'numeric'
+        except:
+            d_type = 'categorical'
     else:
         d_type = 'categorical'
 
     return d_type, parsed_col
 
 def _parse_col(df, col):
-    d_type = None
-    parsed_col = None
+    try:
+        d_type = None
+        parsed_col = None
 
-    d_type, parsed_col = _is_numeric(df, col)    
-    if parsed_col is None and d_type is None:
-        d_type, parsed_col = _is_date(df, col)
-    
-    if parsed_col is None and d_type is None:
-        d_type, parsed_col = _distict_between_numeric_and_categorical(df, col)
-    
-    return d_type, parsed_col
+        
+        d_type, parsed_col = _is_numeric(df, col)    
+        if parsed_col is None and d_type is None:
+            d_type, parsed_col = _is_date(df, col)
+        
+        if parsed_col is None and d_type is None:
+            d_type, parsed_col = _distict_between_numeric_and_categorical(df, col)
+        
+        return d_type, parsed_col
+    except Exception as e:
+        raise ParseColException(f'unable to parse column {col}({repr(e)})') 
 
 def summarise_numeric_col(parsed_col, d_type, replace_missing_values, col):
-    average = round_float(float(parsed_col.mean()))
-    missing_values = int(parsed_col.isna().sum())
-    bins = pd.cut(parsed_col, bins=10)
-    freq_table = bins.value_counts().sort_index().to_dict()
-    categories = {'keys':[], 'values':[]}
-    for key, value in freq_table.items():
-        if replace_missing_values and ( round_float(key.left) <= average <  round_float(key.right)):
-            value += missing_values
-        categories['keys'].append(f"{ round_float(key.left)} , { round_float(key.right)}")
-        categories['values'].append(int(value))
-    var = np.var(parsed_col, ddof=1).__float__()
-    return {
-        "column": col,
-        "type": d_type,
-        "categories": categories,
-        "missing": "replaced" if replace_missing_values else missing_values,
-        "min": round_float(float(parsed_col.min())),
-        "max": round_float(float(parsed_col.max())),
-        "mean": average,
-        "median": round_float(float(parsed_col.median())),
-        "var": round_float(var),
-        "std": round_float(sqrt(var)),
-    }
-
+    try:
+        average = round_float(float(parsed_col.mean()))
+        missing_values = int(parsed_col.isna().sum())
+        bin_edges = np.linspace(min(parsed_col), max(parsed_col), 11) 
+        bins = pd.cut(parsed_col, bins=bin_edges)
+        freq_table = bins.value_counts().sort_index().to_dict()
+        categories = {'keys':[], 'values':[]}
+        for key, value in freq_table.items():
+            if replace_missing_values and ( round_float(key.left) <= average <  round_float(key.right)):
+                value += missing_values
+            categories['keys'].append(f"{ round_float(key.left)} , { round_float(key.right)}")
+            categories['values'].append(int(value))
+        var = np.var(parsed_col, ddof=1).__float__()
+        return {
+            "column": col,
+            "type": d_type,
+            "categories": categories,
+            "missing": "replaced" if replace_missing_values else missing_values,
+            "min": round_float(float(parsed_col.min())),
+            "max": round_float(float(parsed_col.max())),
+            "mean": average,
+            "median": round_float(float(parsed_col.median())),
+            "var": round_float(var),
+            "std": round_float(sqrt(var)),
+        }
+    except Exception as e:
+        raise SummeriseColException(f'unable to summerise column {col}({repr(e)})') 
+    
 def summerise_date_col(parsed_col, d_type, col):
-    bins = pd.cut(parsed_col, bins=10)
-    freq_table = bins.value_counts().sort_index().to_dict()
-    categories = {'keys':[], 'values':[]}
-    for key, value in freq_table.items():
-        categories['keys'].append(f"{str(key.left).split(' ')[0]} , {str(key.right).split(' ')[0]}")
-        categories['values'].append(int(value))
+    try:
+        bins = pd.cut(parsed_col, bins=10)
+        freq_table = bins.value_counts().sort_index().to_dict()
+        categories = {'keys':[], 'values':[]}
+        for key, value in freq_table.items():
+            categories['keys'].append(f"{str(key.left).split(' ')[0]} , {str(key.right).split(' ')[0]}")
+            categories['values'].append(int(value))
 
-    return {
-        "column": col,
-        "type": d_type,
-        "categories": categories,
-        "missing": int(parsed_col.isna().sum()),
-        "min": parsed_col.min(),
-        "max": parsed_col.max(),
-    }
+        return {
+            "column": col,
+            "type": d_type,
+            "categories": categories,
+            "missing": int(parsed_col.isna().sum()),
+            "min": parsed_col.min(),
+            "max": parsed_col.max(),
+        }
+    except Exception as e:
+        raise SummeriseColException(f'unable to summerise column {col}({repr(e)})') 
 
 def summerise_categorical_col(parsed_col, d_type, col):
-    categories = {'keys':[], 'values':[]}
+    try:
+        categories = {'keys':[], 'values':[]}
 
-    for key, value in parsed_col.value_counts().sort_index().to_dict().items():
-        categories['keys'].append(key)
-        categories['values'].append(int(value))
+        for key, value in parsed_col.value_counts().sort_index().to_dict().items():
+            categories['keys'].append(key)
+            categories['values'].append(int(value))
 
-    return {
-        "column": col,
-        "type": d_type,
-        "categories": categories,
-        "missing": int(parsed_col.isna().sum()),
-    } 
+        return {
+            "column": col,
+            "type": d_type,
+            "categories": categories,
+            "missing": int(parsed_col.isna().sum()),
+        }
+    except Exception as e:
+        raise SummeriseColException(f'unable to summerise column {col}({repr(e)})') 
 
 def bar(dataset, independent_variable, category_variable=None, statistic='frequency'):
     lookup_table = {
@@ -415,3 +472,7 @@ def bar(dataset, independent_variable, category_variable=None, statistic='freque
             result['series'].append(data)
     
     return result
+
+
+if __name__ == "__main__":
+    print(extract(115))

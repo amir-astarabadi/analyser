@@ -1,0 +1,3 @@
+
+class SummeriseColException(Exception):
+    pass
